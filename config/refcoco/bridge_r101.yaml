@@ -1,0 +1,65 @@
+DATA:
+  dataset: refcoco
+  train_lmdb: /home/featurize/work/data/lmdb/refcoco/train.lmdb
+  train_split: train
+  val_lmdb: /home/featurize/work/data/lmdb/refcoco/val.lmdb
+  val_split: val
+  mask_root: /home/featurize/work/data/masks/refcoco
+
+TRAIN:
+  # Base Arch (Should be consistent with the baseline)
+  clip_pretrain: pretrain/RN101.pt
+  input_size: 416
+  word_len: 17
+  word_dim: 512
+  ladder_dim: 64
+  nhead: 4
+  multi_stage: 3
+  stride: [2, 1, 2]
+  vis_dim: 512
+  fpn_in: [512, 1024, 512]
+  fpn_out: [256, 512, 1024] # Needed by the Neck (HA) module
+  sync_bn: True
+
+  # --- LAR-Net V2.7 Decoder Settings ---
+  n_iter: 2
+  lambda_aux1: 0.2
+  lambda_aux2: 0.5
+  lambda_boundary: 0.1
+
+  # --- Training Setting ---
+  workers: 32
+  workers_val: 32
+  epochs: 50
+  milestones: [35]
+  start_epoch: 0
+  batch_size: 48
+  batch_size_val: 48
+  base_lr: 0.0001
+  lr_decay: 0.1
+  lr_multi: 1
+  weight_decay: 0.0001
+  max_norm: 1.0
+  manual_seed: 24
+  print_freq: 100
+  dim_ffn: 512
+  # --- Resume & Save ---
+  exp_name: Lar_Net_xiaorong_with_all_8heads
+  output_folder: exp/refcoco
+  save_freq: 1
+  weight: 'pretrain/best_model.pth'
+  resume: ''
+  evaluate: False
+
+
+Distributed:
+  dist_url: tcp://localhost:3681
+  dist_backend: 'nccl'
+  multiprocessing_distributed: True
+  world_size: 1
+  rank: 0
+
+TEST:
+  test_split: val # 在验证集上测试
+  test_lmdb: /home/featurize/work/data/lmdb/refcoco/val.lmdb
+  visualize: False

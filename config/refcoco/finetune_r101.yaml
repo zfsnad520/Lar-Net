@@ -1,0 +1,60 @@
+DATA:
+  dataset: refcoco
+  train_lmdb: /home/featurize/work/data/lmdb/refcoco/train.lmdb
+  train_split: train
+  val_lmdb: /home/featurize/work/data/lmdb/refcoco/val.lmdb
+  val_split: val
+  mask_root: /home/featurize/work/data/masks/refcoco
+
+TRAIN:
+  # Base Arch
+  clip_pretrain: pretrain/RN101.pt
+  input_size: 416
+  word_len: 17
+  word_dim: 512
+  ladder_dim: 64
+  nhead: 4
+  multi_stage: 3
+  stride: [2, 1, 2]
+  vis_dim: 512
+  fpn_in: [512, 1024, 512] # Still needed by the decoder for skip connection dims
+  sync_bn: True
+  dim_ffn: 512
+  # --- LAR-Net V3.2 Decoder Settings ---
+  aux_weights: [0.4] # Only one aux loss for the first fusion stage
+  lambda_contrastive: 0.1
+  # --- Training Setting ---
+  workers: 32
+  workers_val: 16
+  epochs: 50
+  milestones: [35]
+  start_epoch: 0
+  batch_size: 128
+  batch_size_val: 128
+  base_lr: 0.0001
+  lr_decay: 0.1
+  lr_multi: 1
+  weight_decay: 0.
+  max_norm: 0.
+  manual_seed: 3407
+  print_freq: 100
+
+  # --- Resume & Save ---
+  exp_name: LAR-Net_SSPI
+  output_folder: exp/refcoco
+  save_freq: 1
+  weight: pretrain/best_model.pth
+  resume: ''
+  evaluate: False
+
+Distributed:
+  dist_url: tcp://localhost:3681
+  dist_backend: 'nccl'
+  multiprocessing_distributed: True
+  world_size: 1
+  rank: 0
+
+TEST:
+  test_split: val
+  test_lmdb: /home/featurize/work/data/lmdb/refcoco/val.lmdb
+  visualize: False
