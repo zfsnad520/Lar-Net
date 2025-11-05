@@ -1,7 +1,7 @@
 # Lar-Net: A Hierarchical Referring Image Segmentation Framework for Poisonous Weed Identification on the Tibetan Plateau
 This repository contains the official PyTorch implementation for the paper: "**[Lar-Net: A Hierarchical Referring Image Segmentation Framework for
 Poisonous Weed Identification on the Tibetan Plateau]**". 
-![Lar-Net Logo](assets/lar-net-logo.png)
+![Lar-Net Logo](Lar-NetLar-Net.png)
 Our work introduces **Lar-Net**, a novel framework featuring an optimized hierarchical decoder for Referring Image Segmentation (RIS). Lar-Net addresses the limitations of standard Transformer-based decoders, such as spatial detail loss and insufficient vision-language fusion. By incorporating a **Deep Fusion** module, an **Enhanced Context Injector**, and a **Final Refinement** block, Lar-Net achieves state-of-the-art performance on both general benchmarks like RefCOCO and our specialized, challenging **Tibetan Plateau Poisonous Weed Segmentation Dataset (TPSD)**.
 
 ## Core Contributions
