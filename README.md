@@ -80,16 +80,6 @@ The `test.py` script is used for evaluating a trained model on a specific datase
 
 ## Citation
 
-If you find our work useful for your research, please consider citing our paper:
-```bibtex
-@article{your_name_2024_larnet,
-  title={[Your Paper Title Here]},
-  author={[Your Name] and [Co-author Names]},
-  journal={[Journal or Conference Name]},
-  year={2024}
-}
-```
-
 ## Acknowledgements
 
 This project is built upon the excellent codebase of [ETRIS](https://github.com/kkakkkka/ETRIS). We sincerely thank the authors for their valuable contribution to the community.
