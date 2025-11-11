@@ -40,26 +40,11 @@ info = {
 _tokenizer = _Tokenizer()
 
 def custom_collate_fn(batch):
-    """
-    一个自定义的 collate_fn，用于处理包含异构字典的 batch。
-    默认的 collate_fn 会尝试将字典中每个键的值都 stack 起来，
-    但当字典中包含像 ori_img 这样尺寸不一的 numpy 数组时，就会报错。
-    这个函数会智能地处理这种情况。
-    """
-    # batch 是一个列表，每个元素都是 Dataset 的 __getitem__ 返回的元组
-    # e.g., [(img1, text1, param1), (img2, text2, param2), ...]
-    
-    # 1. 使用 zip(*batch) 将 batch 进行转置
-    # 得到: [(img1, img2, ...), (text1, text2, ...), (param1, param2, ...)]
     transposed_batch = list(zip(*batch))
     
-    # 2. 对图像(transposed_batch[0])和文本(transposed_batch[1])使用默认的 collate 函数
-    # 这会将它们正确地堆叠成一个 batch tensor
     images = torch.utils.data.default_collate(transposed_batch[0])
     word_vecs = torch.utils.data.default_collate(transposed_batch[1])
     
-    # 3. 对 params(transposed_batch[2])，我们不做任何处理，直接返回字典的列表
-    # 这样就避免了对内部形状不一的元素（如 ori_img）进行 stack
     params = list(transposed_batch[2])
     
     return images, word_vecs, params
