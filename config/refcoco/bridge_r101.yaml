@@ -60,6 +60,6 @@ Distributed:
   rank: 0
 
 TEST:
-  test_split: val # 在验证集上测试
+  test_split: val
   test_lmdb: /home/featurize/work/data/lmdb/refcoco/val.lmdb
   visualize: False
