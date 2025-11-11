@@ -2,12 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# =========================================================
-# === 辅助模块定义 (这些保持不变，确保它们存在) ===
-# =========================================================
-
 class DepthwiseSeparableConv(nn.Module):
-    """深度可分离卷积模块"""
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False):
         super().__init__()
         self.depthwise = nn.Conv2d(in_channels, in_channels, kernel_size=kernel_size, 
@@ -18,7 +13,6 @@ class DepthwiseSeparableConv(nn.Module):
         return self.pointwise(self.depthwise(x))
 
 class ConvGRUCell(nn.Module):
-    """卷积GRU单元"""
     def __init__(self, input_dim, hidden_dim, kernel_size, use_separable_conv=False):
         super().__init__()
         self.padding = kernel_size // 2
@@ -141,9 +135,6 @@ class GlobalContext_Injector(nn.Module):
         fused_feature = local_feature * (1 - gate) + global_context_aligned * gate
         return self.fusion_refiner(fused_feature)
 
-# =========================================================
-# === 主解码器模块 (结合方案一和方案二) ===
-# =========================================================
 class LAR_Net_Decoder_V27(nn.Module):
     def __init__(self, fpn_in_dims, fpn_out_dim, word_dim, state_dim, n_iter=2):
         super().__init__()
@@ -159,9 +150,9 @@ class LAR_Net_Decoder_V27(nn.Module):
                                  SepConv(fpn_out_dim, fpn_out_dim, 3),
                                  nn.GroupNorm(fpn_out_dim//8, fpn_out_dim), nn.ReLU(inplace=True))
         
-        # --- 方案一: 强化跳跃连接融合模块 1 ---
-        self.fuse1_proj = SepConv(fpn_out_dim + fpn_in_dims[1], fpn_out_dim, 1) # 1x1 卷积
-        self.fuse1_resblock = ResidualConvBlock(fpn_out_dim, use_separable_conv=True) # 残差块
+
+        self.fuse1_proj = SepConv(fpn_out_dim + fpn_in_dims[1], fpn_out_dim, 1) 
+        self.fuse1_resblock = ResidualConvBlock(fpn_out_dim, use_separable_conv=True)
         
         self.cell1 = Medium_FusionRefine_Cell(fpn_out_dim, fpn_out_dim, word_dim, state_dim, n_iter, use_separable_conv=True)
         
@@ -169,20 +160,18 @@ class LAR_Net_Decoder_V27(nn.Module):
                                  SepConv(fpn_out_dim, fpn_out_dim, 3),
                                  nn.GroupNorm(fpn_out_dim//8, fpn_out_dim), nn.ReLU(inplace=True))
                                  
-        # --- 方案一: 强化跳跃连接融合模块 2 ---
-        self.fuse2_proj = SepConv(fpn_out_dim + fpn_in_dims[0], fpn_out_dim, 1) # 1x1 卷积
-        self.fuse2_resblock = ResidualConvBlock(fpn_out_dim, use_separable_conv=True) # 残差块
+
+        self.fuse2_proj = SepConv(fpn_out_dim + fpn_in_dims[0], fpn_out_dim, 1) 
+        self.fuse2_resblock = ResidualConvBlock(fpn_out_dim, use_separable_conv=True) 
         
         self.cell2 = Light_FusionRefine_Cell(fpn_out_dim, fpn_out_dim, word_dim, state_dim, n_iter, use_separable_conv=True)
         
-        # --- 方案二: 加深最终输出层 ---
         final_up_dim = fpn_out_dim // 2
         self.final_up = nn.Sequential(
             nn.Upsample(scale_factor=4, mode='bilinear', align_corners=False), # align_corners=False
             SepConv(fpn_out_dim, final_up_dim, 3),
             nn.GroupNorm(max(1, final_up_dim // 8), final_up_dim),
             nn.ReLU(inplace=True),
-            # 增加一个残差块来精炼全分辨率特征
             ResidualConvBlock(final_up_dim, use_separable_conv=True) 
         )
 
@@ -193,15 +182,12 @@ class LAR_Net_Decoder_V27(nn.Module):
     def forward(self, vis_outs, fq_context, word, state):
         v_skip0, v_skip1, v_skip2 = vis_outs
         
-        # Stage 1 (Highest level)
         v_neck = self.bottleneck_conv(v_skip2)
         v_neck_enhanced = self.shared_injector(v_neck, fq_context)
         v_out_neck = self.cell_neck(v_neck_enhanced, word, state)
         logit_neck = self.seg_head_neck(v_out_neck)
         
-        # Stage 2
         v_in1 = self.up1(v_out_neck)
-        # 应用新的融合模块 1
         fused1_cat = torch.cat([v_in1, v_skip1], dim=1)
         fused1_proj = self.fuse1_proj(fused1_cat)
         v_fused1 = self.fuse1_resblock(fused1_proj)
@@ -210,9 +196,7 @@ class LAR_Net_Decoder_V27(nn.Module):
         v_out1 = self.cell1(v_fused1_enhanced, word, state)
         logit1 = self.seg_head1(v_out1)
         
-        # Stage 3
         v_in2 = self.up2(v_out1)
-        # 应用新的融合模块 2
         fused2_cat = torch.cat([v_in2, v_skip0], dim=1)
         fused2_proj = self.fuse2_proj(fused2_cat)
         v_fused2 = self.fuse2_resblock(fused2_proj)
