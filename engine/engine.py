@@ -13,10 +13,6 @@ from utils.dataset import tokenize
 from utils.misc import (AverageMeter, ProgressMeter, concat_all_gather,
                         trainMetricGPU)
 
-
-# 注意：在这个版本中，所有损失计算都在模型内部完成
-# engine.py 不再需要定义损失函数
-
 def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
     batch_time = AverageMeter('Batch', ':2.2f')
     data_time = AverageMeter('Data', ':2.2f')
@@ -24,7 +20,6 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
     loss_meter = AverageMeter('Loss', ':2.4f')
     iou_meter = AverageMeter('IoU', ':2.2f')
     pr_meter = AverageMeter('Prec@50', ':2.2f')
-    # --- 新增一个 AverageMeter 来跟踪梯度范数 ---
     gnorm_meter = AverageMeter('GradNorm', ':2.2f')
     
     progress = ProgressMeter(
@@ -40,7 +35,6 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
         data_time.update(time.time() - end)
         image = image.cuda(non_blocking=True)
         text = text.cuda(non_blocking=True)
-        # 你的代码中 target 需要 unsqueeze，这里保留
         target = target.cuda(non_blocking=True).unsqueeze(1) 
 
         with amp.autocast():
@@ -48,24 +42,16 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
 
         optimizer.zero_grad()
         scaler.scale(total_loss).backward()
-        
-        # --- 核心修改：在 scaler.step 之前 unscale 并计算梯度范数 ---
-        # 1. Unscale 梯度，这样我们可以观察到真实的梯度值
         scaler.unscale_(optimizer)
-        
-        # 2. 计算并裁剪梯度范数 (如果 args.max_norm 设置了的话)
-        #    torch.nn.utils.clip_grad_norm_ 会返回裁剪前的总范数
+
         if args.max_norm:
             total_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_norm)
         else:
-            # 如果没有设置 max_norm，我们仍然可以计算它以便监控
             total_norm = torch.sqrt(sum(p.grad.data.norm(2).pow(2) for p in model.parameters() if p.grad is not None))
-        # -----------------------------------------------------------
 
         scaler.step(optimizer)
         scaler.update()
 
-        # metric
         iou, pr5 = trainMetricGPU(pred, resized_target, 0.35, 0.5)
         dist.all_reduce(total_loss.detach())
         dist.all_reduce(iou)
@@ -74,7 +60,6 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
         iou = iou / dist.get_world_size()
         pr5 = pr5 / dist.get_world_size()
         
-        # 我们也需要同步 total_norm，以便所有GPU的日志一致
         dist.all_reduce(total_norm)
         total_norm_avg = total_norm / dist.get_world_size()
 
@@ -82,7 +67,6 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
         iou_meter.update(iou.item(), image.size(0))
         pr_meter.update(pr5.item(), image.size(0))
         lr.update(scheduler.get_last_lr()[-1])
-        # --- 更新梯度范数的 meter ---
         gnorm_meter.update(total_norm_avg.item(), image.size(0))
         
         batch_time.update(time.time() - end)
@@ -99,7 +83,7 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
                         "training/loss": loss_meter.val,
                         "training/iou": iou_meter.val,
                         "training/prec@50": pr_meter.val,
-                        "training/grad_norm": gnorm_meter.avg, # <-- 将平均梯度范数记录到wandb
+                        "training/grad_norm": gnorm_meter.avg, 
                     },
                     step=epoch * len(train_loader) + (i + 1))
 
@@ -110,11 +94,8 @@ def validate(val_loader, model, epoch, args, len_train_loader):
     model.eval()
     time.sleep(2)
     for imgs, texts, param in val_loader:
-        # data
         imgs = imgs.cuda(non_blocking=True)
         texts = texts.cuda(non_blocking=True)
-        # inference
-        # 在推理模式下，模型返回 detach 过的 logits
         preds = model(imgs, texts)
         preds = torch.sigmoid(preds)
         if preds.shape[-2:] != imgs.shape[-2:]:
@@ -122,7 +103,6 @@ def validate(val_loader, model, epoch, args, len_train_loader):
                                   size=imgs.shape[-2:],
                                   mode='bicubic',
                                   align_corners=False).squeeze(1)
-        # process one batch
         for pred, mask_dir, mat, ori_size in zip(preds, param['mask_dir'],
                                                  param['inverse'],
                                                  param['ori_size']):
@@ -180,10 +160,8 @@ def inference(test_loader, model, args):
     model.eval()
     time.sleep(2)
     for img, param in tbar:
-        # data
         img = img.cuda(non_blocking=True)
         mask = cv2.imread(param['mask_dir'][0], flags=cv2.IMREAD_GRAYSCALE)
-        # dump image & mask
         if args.visualize:
             seg_id = param['seg_id'][0].cpu().numpy()
             img_name = '{}-img.jpg'.format(seg_id)
@@ -192,7 +170,6 @@ def inference(test_loader, model, args):
                         img=param['ori_img'][0].cpu().numpy())
             cv2.imwrite(filename=os.path.join(args.vis_dir, mask_name),
                         img=mask)
-        # multiple sentences
         for sent in param['sents']:
             mask = mask / 255.
             text = tokenize(sent, args.word_len, True)
@@ -205,7 +182,6 @@ def inference(test_loader, model, args):
                                      size=img.shape[-2:],
                                      mode='bicubic',
                                      align_corners=False).squeeze()
-            # process one sentence
             h, w = param['ori_size'].numpy()[0]
             mat = param['inverse'].numpy()[0]
             pred = pred.cpu().numpy()
@@ -213,12 +189,10 @@ def inference(test_loader, model, args):
                                   flags=cv2.INTER_CUBIC,
                                   borderValue=0.)
             pred = np.array(pred > 0.35)
-            # iou
             inter = np.logical_and(pred, mask)
             union = np.logical_or(pred, mask)
             iou = np.sum(inter) / (np.sum(union) + 1e-6)
             iou_list.append(iou)
-            # dump prediction
             if args.visualize:
                 pred = np.array(pred*255, dtype=np.uint8)
                 sent = "_".join(sent[0].split(" "))
