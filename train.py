@@ -176,7 +176,6 @@ def main_worker(args):
         train(train_loader, model, optimizer, scheduler, scaler, epoch_log, args)
 
         # evaluation
-        # 将 len(train_loader) 作为额外参数传递给 validate 函数
         iou, prec_dict = validate(val_loader, model, epoch_log, args, len(train_loader))
 
         # save model
