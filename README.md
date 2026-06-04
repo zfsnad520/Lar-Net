@@ -31,7 +31,7 @@ Our work introduces **Lar-Net**, a novel framework featuring an optimized hierar
 
 Our project utilizes two main types of datasets: the public benchmark RefCOCO and our custom TPSD. All datasets need to be converted into LMDB format for efficient training.
 
-#### TPSD (Our Custom Dataset) The Tibetan Plateau Poisonous Weed Segmentation Dataset (TPSD) will be used for subsequent research and has not yet been publicly released.
+#### TPSD (Our Custom Dataset) The complete dataset can be accessed at \url{https://huggingface.co/datasets/zfsnad/TPSD_FULL}
 #### RefCOCO
 
 Please follow the standard procedures to download and preprocess the RefCOCO, RefCOCO+, and RefCOCOg datasets. This includes downloading MSCOCO images, the respective annotation files (`refs(unc).p`, etc.), and mask files. Convert all splits (`train`, `val`, `testA`, `testB`) into LMDB format and place them in `/home/featurize/work/data/lmdb/refcoco/`.
